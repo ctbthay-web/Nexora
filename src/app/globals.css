@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f5f6fa; --card: #ffffff; --fg: #14161f; --muted: #6b7280; --line: #e4e6ee; --brand: #6d5efc;
+}
+.dark {
+  --bg: #0e1016; --card: #171a23; --fg: #e8eaf0; --muted: #9aa1b2; --line: #272b38;
+}
+body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+
+@layer components {
+  .card { @apply rounded-xl border border-line bg-card p-4; }
+  .btn { @apply inline-flex items-center justify-center gap-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-medium transition hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply border-transparent bg-brand text-white; }
+  .btn-danger { @apply border-transparent bg-rose-600 text-white; }
+  .input { @apply w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand; }
+  .label { @apply mb-1 block text-xs font-medium text-muted; }
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .th { @apply px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted; }
+  .td { @apply px-3 py-2 align-middle text-sm; }
+}
