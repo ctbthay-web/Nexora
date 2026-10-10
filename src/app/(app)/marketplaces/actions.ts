@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { MARKETPLACES } from "@/lib/constants";
 import { go, logActivity, requireUser } from "@/lib/session";
+import { getMlToken, mlEnvOk, mlGet } from "@/lib/ml";
 
 export async function saveMarketplace(formData: FormData) {
   const { supabase, user } = await requireUser();
@@ -25,6 +26,31 @@ export async function saveMarketplace(formData: FormData) {
 export async function testMarketplace(formData: FormData) {
   const { supabase, user } = await requireUser();
   const mp = String(formData.get("marketplace"));
+  if (mp === "mercadolivre") {
+    // Teste REAL: pergunta ao Mercado Livre quem é o usuário conectado.
+    let err: string | null = null;
+    let nick = "";
+    if (!mlEnvOk()) err = "Faltam ML_CLIENT_ID e ML_CLIENT_SECRET na Vercel.";
+    else {
+      try {
+        const token = await getMlToken(supabase, user.id);
+        if (!token) err = "Ainda não conectado. Clique em Conectar Mercado Livre.";
+        else {
+          const r = await mlGet(token, "/users/me");
+          if (!r.ok) err = `O Mercado Livre respondeu ${r.status}: ${r.json?.message ?? "sem detalhes"}`;
+          else nick = r.json?.nickname ?? "";
+        }
+      } catch (e: any) { err = e?.message ?? "Falha ao testar."; }
+    }
+    if (err) {
+      await supabase.from("marketplace_connections").update({ status: "error", last_error: err }).eq("marketplace", mp);
+      await logActivity(supabase, user.id, "marketplace.test_failed", { title: "Mercado Livre" });
+      go("/marketplaces", "err", `Mercado Livre: ${err}`);
+    }
+    await supabase.from("marketplace_connections").update({ status: "configured", last_error: null, last_sync_at: new Date().toISOString() }).eq("marketplace", mp);
+    await logActivity(supabase, user.id, "marketplace.checked", { title: "Mercado Livre" });
+    go("/marketplaces", "ok", `Mercado Livre: conexão real funcionando${nick ? ` (conta ${nick})` : ""}.`);
+  }
   const { data: c } = await supabase.from("marketplace_connections").select("affiliate_id").eq("marketplace", mp).single();
   const label = MARKETPLACES[mp as keyof typeof MARKETPLACES]?.label ?? mp;
   if (!c?.affiliate_id) {
