@@ -1,4 +1,5 @@
 import SubmitButton from "@/components/SubmitButton";
+import CaptionField from "@/components/CaptionField";
 import { MARKETPLACES } from "@/lib/constants";
 import { saveProduct } from "./actions";
 
@@ -50,16 +51,22 @@ export default function ProductForm({ p }: { p?: any }) {
         </label>
       </div>
       <div className="md:col-span-2">
-        <label className="label" htmlFor="image_url">URL da imagem</label>
-        <input id="image_url" name="image_url" type="url" defaultValue={p?.image_url ?? ""} className="input" />
+        <label className="label" htmlFor="image_url">Imagem do produto (endereço da imagem)</label>
+        <input id="image_url" name="image_url" type="url" defaultValue={p?.image_url ?? ""} placeholder="Cole o endereço da imagem do produto (clique direito na foto → copiar endereço da imagem)" className="input" />
+        {p?.image_url && /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.image_url} alt="" className="mt-2 h-32 w-32 rounded-lg border border-line object-cover" />}
       </div>
-      <div className="md:col-span-2">
-        <label className="label" htmlFor="promo_text">Texto de divulgação (rascunho manual; IA chega na Fase 2)</label>
-        <textarea id="promo_text" name="promo_text" rows={3} defaultValue={p?.promo_text ?? ""} className="input" />
-      </div>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 text-sm md:col-span-2">
         <input type="checkbox" name="free_shipping" defaultChecked={p?.free_shipping === true} /> Frete grátis confirmado
       </label>
+      <div>
+        <label className="label" htmlFor="shipping_info">Informação de frete</label>
+        <input id="shipping_info" name="shipping_info" defaultValue={p?.shipping_info ?? ""} placeholder="Ex.: frete grátis acima de R$ 79 · chega em até 5 dias" className="input" />
+      </div>
+      <div>
+        <label className="label" htmlFor="shipping_coupon">Cupom de frete (só se real)</label>
+        <input id="shipping_coupon" name="shipping_coupon" defaultValue={p?.shipping_coupon ?? ""} placeholder="Ex.: FRETEGRATIS" className="input" />
+      </div>
+      <div className="md:col-span-2"><CaptionField defaultValue={p?.promo_text} /></div>
       <div className="md:col-span-2"><SubmitButton>{p ? "Salvar alterações" : "Cadastrar produto"}</SubmitButton></div>
     </form>
   );
