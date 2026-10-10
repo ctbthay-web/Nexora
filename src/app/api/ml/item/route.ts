@@ -87,10 +87,11 @@ export async function POST(req: NextRequest) {
   if (/(^|\.)meli\.la$/.test(u.hostname) || /\/sec\//.test(u.pathname)) {
     try { const r = await fetch(u, { headers: { "user-agent": UA }, redirect: "follow", cache: "no-store" }); const f = new URL(r.url); if (okHost(f)) u = f; } catch {}
   }
+  if (/^\/social\//.test(u.pathname)) return NextResponse.json({ error: "Esse link abre o seu perfil de afiliado, não um produto. Abra o produto no Mercado Livre e use o botão Compartilhar (ou copie o endereço da página do produto)." }, { status: 422 });
   const token = await getMlToken(supabase, user.id).catch(() => null);
   let r = await viaApi(token, u);
   let apiErr: string | null = null;
   if ("error" in r) { apiErr = r.error; r = await viaPage(u); }
   if ("error" in r) return NextResponse.json({ error: `${apiErr} ${r.error}`.trim() }, { status: 422 });
-  return NextResponse.json({ ...r, permalink: r.permalink ?? u.toString() });
+  return NextResponse.json({ ...r, permalink: r.permalink ?? u.toString(), shared: new URL(String(body.url).trim()).hostname.endsWith("meli.la") });
 }
