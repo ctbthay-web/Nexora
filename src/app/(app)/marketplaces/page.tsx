@@ -3,6 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { requireUser } from "@/lib/session";
 import { MARKETPLACES, type MarketplaceKey } from "@/lib/constants";
 import { fmtDate } from "@/lib/utils";
+import { mlEnvOk } from "@/lib/ml";
 import { saveMarketplace, testMarketplace } from "./actions";
 
 const ST: Record<string, [string, string]> = {
@@ -14,6 +15,7 @@ const ST: Record<string, [string, string]> = {
 export default async function MarketplacesPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
   const { supabase } = await requireUser();
   const { data } = await supabase.from("marketplace_connections").select("*");
+  const { data: mlTok } = await supabase.from("ml_tokens").select("ml_user_id,expires_at").maybeSingle();
   const byKey = new Map((data ?? []).map((r: any) => [r.marketplace, r]));
   return (
     <div className="space-y-4">
@@ -33,6 +35,17 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
               </div>
               <p className="text-xs text-muted"><b>Autenticação:</b> {m.auth}</p>
               <p className="text-xs text-muted">{m.howTo}</p>
+              {k === "mercadolivre" && (
+                <div className="rounded-lg border border-line bg-bg p-3 text-xs">
+                  {!mlEnvOk() ? (
+                    <p className="text-amber-600">Faltam as variáveis ML_CLIENT_ID e ML_CLIENT_SECRET na Vercel (Settings → Environment Variables). Depois faça Redeploy.</p>
+                  ) : mlTok ? (
+                    <p className="text-emerald-600">✔ Conectado ao Mercado Livre{mlTok.ml_user_id ? ` (conta ${mlTok.ml_user_id})` : ""}. <a href="/api/ml/connect" className="underline">Reconectar</a> · <a href="/buscar" className="underline">Buscar produtos</a></p>
+                  ) : (
+                    <a href="/api/ml/connect" className="btn btn-primary">Conectar Mercado Livre</a>
+                  )}
+                </div>
+              )}
               <form action={saveMarketplace} className="space-y-2">
                 <input type="hidden" name="marketplace" value={k} />
                 <div><label className="label">{m.idLabel}</label><input name="affiliate_id" defaultValue={c?.affiliate_id ?? ""} className="input" /></div>
