@@ -3,7 +3,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const ML_API = "https://api.mercadolibre.com";
 export const ML_AUTH = "https://auth.mercadolivre.com.br/authorization";
 
-export const mlEnvOk = () => !!(process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET);
+export type MlApp = { clientId: string; clientSecret: string };
+
+/** Credenciais da aplicação ML: as salvas pelo usuário na tela do app; senão (opcional) as variáveis de ambiente. */
+export async function getMlApp(supabase: SupabaseClient, userId: string): Promise<MlApp | null> {
+  const { data } = await supabase.from("ml_app").select("client_id,client_secret").eq("user_id", userId).maybeSingle();
+  if (data?.client_id && data?.client_secret) return { clientId: data.client_id, clientSecret: data.client_secret };
+  if (process.env.ML_CLIENT_ID && process.env.ML_CLIENT_SECRET) return { clientId: process.env.ML_CLIENT_ID, clientSecret: process.env.ML_CLIENT_SECRET };
+  return null;
+}
+
+export const ML_NEEDS_APP = "Informe o ID e a chave da sua aplicação em Marketplaces → Mercado Livre.";
 
 export type MlItem = {
   id: string; title: string; price: number; original_price: number | null;
@@ -21,11 +31,11 @@ export function mapMlItem(r: any): MlItem | null {
   };
 }
 
-async function tokenRequest(body: Record<string, string>) {
+async function tokenRequest(app: MlApp, body: Record<string, string>) {
   const res = await fetch(`${ML_API}/oauth/token`, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: process.env.ML_CLIENT_ID!, client_secret: process.env.ML_CLIENT_SECRET!, ...body }),
+    body: new URLSearchParams({ client_id: app.clientId, client_secret: app.clientSecret, ...body }),
     cache: "no-store",
   });
   const j: any = await res.json().catch(() => ({}));
@@ -33,8 +43,8 @@ async function tokenRequest(body: Record<string, string>) {
   return j as { access_token: string; refresh_token: string; expires_in: number; user_id?: number };
 }
 
-export async function exchangeCode(code: string, redirectUri: string) {
-  return tokenRequest({ grant_type: "authorization_code", code, redirect_uri: redirectUri });
+export async function exchangeCode(app: MlApp, code: string, redirectUri: string) {
+  return tokenRequest(app, { grant_type: "authorization_code", code, redirect_uri: redirectUri });
 }
 
 /** Devolve um access token válido (renova com o refresh token quando perto de expirar) ou null. */
@@ -42,8 +52,9 @@ export async function getMlToken(supabase: SupabaseClient, userId: string): Prom
   const { data: t } = await supabase.from("ml_tokens").select("*").eq("user_id", userId).maybeSingle();
   if (!t) return null;
   if (new Date(t.expires_at).getTime() - Date.now() > 60_000) return t.access_token;
-  if (!mlEnvOk()) return null;
-  const n = await tokenRequest({ grant_type: "refresh_token", refresh_token: t.refresh_token });
+  const app = await getMlApp(supabase, userId);
+  if (!app) return null;
+  const n = await tokenRequest(app, { grant_type: "refresh_token", refresh_token: t.refresh_token });
   await supabase.from("ml_tokens").update({
     access_token: n.access_token, refresh_token: n.refresh_token,
     expires_at: new Date(Date.now() + n.expires_in * 1000).toISOString(), updated_at: new Date().toISOString(),
