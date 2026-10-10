@@ -2,7 +2,24 @@
 import { revalidatePath } from "next/cache";
 import { MARKETPLACES } from "@/lib/constants";
 import { go, logActivity, requireUser } from "@/lib/session";
-import { getMlToken, mlEnvOk, mlGet } from "@/lib/ml";
+import { ML_NEEDS_APP, getMlApp, getMlToken, mlGet } from "@/lib/ml";
+
+/** Salva ID e chave da aplicação do Mercado Livre na conta do usuário (nunca devolvidos ao navegador). */
+export async function saveMlApp(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const clientId = String(formData.get("client_id") ?? "").trim();
+  const secret = String(formData.get("client_secret") ?? "").trim();
+  if (!/^\d{6,20}$/.test(clientId)) go("/marketplaces", "err", "O ID da aplicação deve ter só números.");
+  const { data: cur } = await supabase.from("ml_app").select("client_id,client_secret").eq("user_id", user.id).maybeSingle();
+  const finalSecret = secret || cur?.client_secret || "";
+  if (finalSecret.length < 10) go("/marketplaces", "err", "Informe a chave secreta (Client Secret) da aplicação.");
+  const { error } = await supabase.from("ml_app").upsert({ user_id: user.id, client_id: clientId, client_secret: finalSecret, updated_at: new Date().toISOString() });
+  if (error) go("/marketplaces", "err", `Não consegui salvar: ${error.message}`);
+  if (cur && (cur.client_id !== clientId || cur.client_secret !== finalSecret)) await supabase.from("ml_tokens").delete().eq("user_id", user.id);
+  await logActivity(supabase, user.id, "ml.credentials_saved", { title: "Mercado Livre" });
+  revalidatePath("/marketplaces");
+  go("/marketplaces", "ok", "Aplicação salva. Agora clique em Conectar Mercado Livre.");
+}
 
 export async function saveMarketplace(formData: FormData) {
   const { supabase, user } = await requireUser();
@@ -30,7 +47,7 @@ export async function testMarketplace(formData: FormData) {
     // Teste REAL: pergunta ao Mercado Livre quem é o usuário conectado.
     let err: string | null = null;
     let nick = "";
-    if (!mlEnvOk()) err = "Faltam ML_CLIENT_ID e ML_CLIENT_SECRET na Vercel.";
+    if (!(await getMlApp(supabase, user.id))) err = ML_NEEDS_APP;
     else {
       try {
         const token = await getMlToken(supabase, user.id);
