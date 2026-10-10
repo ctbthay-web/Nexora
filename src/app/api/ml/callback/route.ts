@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { exchangeCode, mlEnvOk } from "@/lib/ml";
+import { ML_NEEDS_APP, exchangeCode, getMlApp } from "@/lib/ml";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/login", origin));
-  if (!mlEnvOk()) return done("err", "Faltam ML_CLIENT_ID e ML_CLIENT_SECRET nas variáveis da Vercel.");
+  const app = await getMlApp(supabase, user.id);
+  if (!app) return done("err", ML_NEEDS_APP);
 
   const p = req.nextUrl.searchParams;
   if (p.get("error")) return done("err", `Mercado Livre: ${p.get("error_description") ?? p.get("error")}`);
@@ -24,13 +25,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const redirect = process.env.ML_REDIRECT_URI ?? `${origin}/api/ml/callback`;
-    const t = await exchangeCode(code, redirect);
+    const t = await exchangeCode(app, code, redirect);
     const { error } = await supabase.from("ml_tokens").upsert({
       user_id: user.id, access_token: t.access_token, refresh_token: t.refresh_token,
       expires_at: new Date(Date.now() + t.expires_in * 1000).toISOString(),
       ml_user_id: t.user_id ?? null, updated_at: new Date().toISOString(),
     });
-    if (error) return done("err", `Não consegui salvar a conexão: ${error.message} (rodou o SQL 0003?)`);
+    if (error) return done("err", `Não consegui salvar a conexão: ${error.message}`);
     await supabase.from("marketplace_connections").update({ status: "configured", last_error: null }).eq("marketplace", "mercadolivre");
     await supabase.from("activity_log").insert({ user_id: user.id, action: "ml.connected", details: { title: "Mercado Livre" } });
     return done("ok", "Mercado Livre conectado.");
