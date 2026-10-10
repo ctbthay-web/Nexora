@@ -2,11 +2,13 @@ import SubmitButton from "@/components/SubmitButton";
 import CaptionField from "@/components/CaptionField";
 import { MARKETPLACES } from "@/lib/constants";
 import { saveProduct } from "./actions";
+import LinkImport from "./LinkImport";
 
 export default function ProductForm({ p }: { p?: any }) {
   return (
     <form action={saveProduct} className="card grid gap-3 md:grid-cols-2">
       {p && <input type="hidden" name="id" value={p.id} />}
+      {!p && <LinkImport />}
       <div className="md:col-span-2">
         <label className="label" htmlFor="title">Nome do produto *</label>
         <input id="title" name="title" required defaultValue={p?.title} className="input" />
