@@ -43,8 +43,10 @@ async function tokenRequest(app: MlApp, body: Record<string, string>) {
   return j as { access_token: string; refresh_token: string; expires_in: number; user_id?: number };
 }
 
-export async function exchangeCode(app: MlApp, code: string, redirectUri: string) {
-  return tokenRequest(app, { grant_type: "authorization_code", code, redirect_uri: redirectUri });
+export async function exchangeCode(app: MlApp, code: string, redirectUri: string, codeVerifier?: string) {
+  const body: Record<string, string> = { grant_type: "authorization_code", code, redirect_uri: redirectUri };
+  if (codeVerifier) body.code_verifier = codeVerifier;
+  return tokenRequest(app, body);
 }
 
 /** Devolve um access token válido (renova com o refresh token quando perto de expirar) ou null. */
