@@ -3,6 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { requireUser } from "@/lib/session";
 import { MARKETPLACES, type MarketplaceKey } from "@/lib/constants";
 import { fmtDate } from "@/lib/utils";
+import CopyButton from "@/components/CopyButton";
 import { headers } from "next/headers";
 import { saveMarketplace, saveMlApp, testMarketplace } from "./actions";
 
@@ -50,8 +51,20 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
               {k === "mercadolivre" && (
                 <div className="space-y-3 rounded-lg border border-line bg-bg p-3 text-xs">
                   <p className="font-semibold">Conexão pela sua aplicação do Mercado Livre</p>
-                  <p className="text-muted">No painel de desenvolvedores do Mercado Livre, cadastre esta URL de redirecionamento (exatamente assim):</p>
+                  <p className="text-muted">Passo a passo para conectar sem erro, em <b>developers.mercadolivre.com.br</b> → Minhas aplicações → sua aplicação → Editar:</p>
+                  <ol className="list-decimal space-y-1 pl-5 text-muted">
+                    <li><b>URIs de redirect:</b> cole o endereço abaixo e clique em “Adicionar URI de redirect” (precisa aparecer na lista).</li>
+                    <li><b>Fluxos OAuth:</b> deixe marcados “Authorization Code” e “Refresh Token”.</li>
+                    <li><b>PKCE:</b> pode ficar marcado ou desmarcado, o Nexora já suporta.</li>
+                    <li><b>Permissões (scopes):</b> só leitura (informações do usuário e itens/busca).</li>
+                    <li><b>URL de notificações:</b> deixe vazia.</li>
+                    <li>Marque o reCAPTCHA só na hora de clicar em “Editar”.</li>
+                    <li>Abaixo, preencha ID e chave da aplicação, clique em “Salvar aplicação”, depois em “Conectar Mercado Livre” e “Permitir”.</li>
+                  </ol>
+                  <p className="text-muted">URI de redirect (copie exatamente assim, sem espaço e sem barra no final):</p>
                   <code className="block break-all rounded border border-line bg-card p-2">{redirectUri}</code>
+                  <CopyButton text={redirectUri} label="Copiar endereço" />
+                  <p className="text-muted">Abra o app sempre por este mesmo endereço (<b>{redirectUri.replace("/api/ml/callback", "")}</b>); outro endereço da Vercel gera outro redirect e dá erro.</p>
                   <form action={saveMlApp} className="space-y-2">
                     <div><label className="label">ID da aplicação (Client ID)</label><input name="client_id" defaultValue={mlApp?.client_id ?? ""} inputMode="numeric" className="input" /></div>
                     <div><label className="label">Chave secreta (Client Secret){mlApp ? " — já salva; deixe em branco para manter" : ""}</label><input name="client_secret" type="password" autoComplete="off" placeholder={mlApp ? "••••••••••" : ""} className="input" /></div>
