@@ -3,8 +3,15 @@ import SubmitButton from "@/components/SubmitButton";
 import { requireUser } from "@/lib/session";
 import { MARKETPLACES, type MarketplaceKey } from "@/lib/constants";
 import { fmtDate } from "@/lib/utils";
-import { mlEnvOk } from "@/lib/ml";
-import { saveMarketplace, testMarketplace } from "./actions";
+import { headers } from "next/headers";
+import { saveMarketplace, saveMlApp, testMarketplace } from "./actions";
+
+const LOGTXT: Record<string, string> = {
+  "ml.credentials_saved": "Aplicação salva",
+  "ml.connected": "Conectado",
+  "marketplace.checked": "Teste de conexão OK",
+  "marketplace.test_failed": "Teste de conexão falhou",
+};
 
 const ST: Record<string, [string, string]> = {
   not_configured: ["Não configurado", "bg-slate-500/15 text-muted"],
@@ -13,7 +20,12 @@ const ST: Record<string, [string, string]> = {
 };
 
 export default async function MarketplacesPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const { data: mlApp } = await supabase.from("ml_app").select("client_id").maybeSingle();
+  const { data: mlLog } = await supabase.from("activity_log").select("action,created_at").eq("details->>title", "Mercado Livre").order("created_at", { ascending: false }).limit(5);
+  const h = headers();
+  const redirectUri = `https://${h.get("x-forwarded-host") ?? h.get("host")}/api/ml/callback`;
+  void user;
   const { data } = await supabase.from("marketplace_connections").select("*");
   const { data: mlTok } = await supabase.from("ml_tokens").select("ml_user_id,expires_at").maybeSingle();
   const byKey = new Map((data ?? []).map((r: any) => [r.marketplace, r]));
@@ -21,7 +33,7 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Marketplaces e afiliados</h1>
       <Flash searchParams={searchParams} />
-      <p className="text-xs text-muted">Chaves secretas de API (App ID, Secret…) nunca são digitadas aqui: ficam nas variáveis de ambiente do servidor (.env.local) a partir da Fase 2. Esta tela guarda só o identificador público de afiliado.</p>
+      <p className="text-xs text-muted">O identificador de afiliado é público. Para o Mercado Livre, o ID e a chave da sua aplicação ficam salvos na sua conta (protegidos por RLS) e nunca voltam para a tela. As demais chaves ficam no servidor.</p>
       <div className="grid gap-4 lg:grid-cols-2">
         {(Object.keys(MARKETPLACES) as MarketplaceKey[]).map((k) => {
           const m = MARKETPLACES[k];
@@ -36,13 +48,25 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
               <p className="text-xs text-muted"><b>Autenticação:</b> {m.auth}</p>
               <p className="text-xs text-muted">{m.howTo}</p>
               {k === "mercadolivre" && (
-                <div className="rounded-lg border border-line bg-bg p-3 text-xs">
-                  {!mlEnvOk() ? (
-                    <p className="text-amber-600">Faltam as variáveis ML_CLIENT_ID e ML_CLIENT_SECRET na Vercel (Settings → Environment Variables). Depois faça Redeploy.</p>
-                  ) : mlTok ? (
+                <div className="space-y-3 rounded-lg border border-line bg-bg p-3 text-xs">
+                  <p className="font-semibold">Conexão pela sua aplicação do Mercado Livre</p>
+                  <p className="text-muted">No painel de desenvolvedores do Mercado Livre, cadastre esta URL de redirecionamento (exatamente assim):</p>
+                  <code className="block break-all rounded border border-line bg-card p-2">{redirectUri}</code>
+                  <form action={saveMlApp} className="space-y-2">
+                    <div><label className="label">ID da aplicação (Client ID)</label><input name="client_id" defaultValue={mlApp?.client_id ?? ""} inputMode="numeric" className="input" /></div>
+                    <div><label className="label">Chave secreta (Client Secret){mlApp ? " — já salva; deixe em branco para manter" : ""}</label><input name="client_secret" type="password" autoComplete="off" placeholder={mlApp ? "••••••••••" : ""} className="input" /></div>
+                    <SubmitButton>Salvar aplicação</SubmitButton>
+                  </form>
+                  {!mlApp ? null : mlTok ? (
                     <p className="text-emerald-600">✔ Conectado ao Mercado Livre{mlTok.ml_user_id ? ` (conta ${mlTok.ml_user_id})` : ""}. <a href="/api/ml/connect" className="underline">Reconectar</a> · <a href="/buscar" className="underline">Buscar produtos</a></p>
                   ) : (
                     <a href="/api/ml/connect" className="btn btn-primary">Conectar Mercado Livre</a>
+                  )}
+                  {(mlLog ?? []).length > 0 && (
+                    <div className="border-t border-line pt-2 text-muted">
+                      <p className="mb-1 font-semibold">Registro da conexão</p>
+                      {(mlLog ?? []).map((l: any, n: number) => <p key={n}>{fmtDate(l.created_at)} · {LOGTXT[l.action] ?? l.action}</p>)}
+                    </div>
                   )}
                 </div>
               )}
