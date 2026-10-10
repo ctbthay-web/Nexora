@@ -24,20 +24,34 @@ function ids(u: URL) {
 
 async function viaApi(token: string | null, u: URL): Promise<Out | { error: string }> {
   const get = (p: string) => mlGet(token ?? "", p);
+  const why = (r: { status: number; json: any }) => `O Mercado Livre respondeu ${r.status}: ${r.json?.message ?? r.json?.error ?? "sem detalhes"}`;
   let { item } = ids(u);
   const { cat } = ids(u);
+  let lastErr: string | null = null;
   if (!item && cat) {
+    // Página de catálogo (/p/MLB...): descobre um anúncio vendável desse produto.
     const p = await get(`/products/${cat}`);
-    if (p.ok) item = p.json?.buy_box_winner?.item_id ?? null;
-    if (!item && p.ok && p.json?.name) {
-      const bb = p.json.buy_box_winner;
-      const price = typeof bb?.price === "number" ? bb.price : null;
-      if (price) return { title: p.json.name, price, original_price: typeof bb.original_price === "number" && bb.original_price > price ? bb.original_price : null, image: p.json.pictures?.[0]?.url?.replace(/^http:/, "https:") ?? null, free_shipping: bb.shipping?.free_shipping === true, category: null, permalink: null, source: "api" };
+    if (p.ok) {
+      item = p.json?.buy_box_winner?.item_id ?? null;
+      if (!item && p.json?.name && typeof p.json?.buy_box_winner?.price === "number") {
+        const bb = p.json.buy_box_winner;
+        return { title: p.json.name, price: bb.price, original_price: typeof bb.original_price === "number" && bb.original_price > bb.price ? bb.original_price : null, image: p.json.pictures?.[0]?.url?.replace(/^http:/, "https:") ?? null, free_shipping: bb.shipping?.free_shipping === true, category: null, permalink: null, source: "api" };
+      }
+    } else lastErr = `Produto do catálogo: ${why(p)}`;
+    if (!item) {
+      const it = await get(`/products/${cat}/items?limit=1`);
+      if (it.ok) item = it.json?.results?.[0]?.item_id ?? it.json?.results?.[0]?.id ?? null;
+      else if (!lastErr) lastErr = `Itens do catálogo: ${why(it)}`;
+    }
+    if (!item) {
+      const s = await get(`/sites/MLB/search?product_id=${cat}&limit=1`);
+      if (s.ok) item = s.json?.results?.[0]?.id ?? null;
+      else if (!lastErr) lastErr = `Busca: ${why(s)}`;
     }
   }
-  if (!item) return { error: "Não achei o código do anúncio nesse link." };
+  if (!item) return { error: lastErr ?? "Não achei o código do anúncio nesse link." };
   const r = await get(`/items/${item}`);
-  if (!r.ok) return { error: `O Mercado Livre respondeu ${r.status}: ${r.json?.message ?? r.json?.error ?? "sem detalhes"}` };
+  if (!r.ok) return { error: why(r) };
   const j = r.json;
   if (typeof j?.title !== "string" || typeof j?.price !== "number") return { error: "O Mercado Livre não devolveu título e preço desse anúncio." };
   let category: string | null = null;
