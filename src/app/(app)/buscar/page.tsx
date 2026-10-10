@@ -3,7 +3,7 @@ import Flash from "@/components/Flash";
 import SubmitButton from "@/components/SubmitButton";
 import { requireUser } from "@/lib/session";
 import { brl } from "@/lib/utils";
-import { getMlToken, mlEnvOk, searchMl, type MlItem } from "@/lib/ml";
+import { ML_NEEDS_APP, getMlApp, getMlToken, searchMl, type MlItem } from "@/lib/ml";
 import { saveFromMl } from "./actions";
 
 export default async function Buscar({ searchParams }: { searchParams: { q?: string; ok?: string; err?: string } }) {
@@ -12,8 +12,9 @@ export default async function Buscar({ searchParams }: { searchParams: { q?: str
 
   let notice: string | null = null;
   let items: MlItem[] = [];
-  const token = mlEnvOk() ? await getMlToken(supabase, user.id).catch(() => null) : null;
-  if (!mlEnvOk()) notice = "Faltam ML_CLIENT_ID e ML_CLIENT_SECRET nas variáveis da Vercel.";
+  const hasApp = !!(await getMlApp(supabase, user.id));
+  const token = hasApp ? await getMlToken(supabase, user.id).catch(() => null) : null;
+  if (!hasApp) notice = ML_NEEDS_APP;
   else if (!token) notice = "Mercado Livre ainda não conectado. Vá em Marketplaces e clique em Conectar.";
   else if (q) {
     const r = await searchMl(token, q);
