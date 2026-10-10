@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const done = (kind: "ok" | "err", msg: string) => {
     const res = NextResponse.redirect(new URL(`/marketplaces?${kind}=${encodeURIComponent(msg)}`, origin));
     res.cookies.delete({ name: "ml_state", path: "/api/ml" });
+    res.cookies.delete({ name: "ml_verifier", path: "/api/ml" });
     return res;
   };
   const supabase = createClient();
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const redirect = process.env.ML_REDIRECT_URI ?? `${origin}/api/ml/callback`;
-    const t = await exchangeCode(app, code, redirect);
+    const t = await exchangeCode(app, code, redirect, req.cookies.get("ml_verifier")?.value);
     const { error } = await supabase.from("ml_tokens").upsert({
       user_id: user.id, access_token: t.access_token, refresh_token: t.refresh_token,
       expires_at: new Date(Date.now() + t.expires_in * 1000).toISOString(),
