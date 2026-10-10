@@ -47,7 +47,7 @@ export async function saveProduct(formData: FormData) {
     title: title!, marketplace: marketplace!, price: price!, previous_price: previous,
     original_url: originalUrl, affiliate_url: affiliateUrl, affiliate_verified: verified && !!affiliateUrl,
     image_url: imageUrl, category: str(formData, "category"), coupon: str(formData, "coupon"),
-    rating, free_shipping: formData.get("free_shipping") === "on" ? true : null,
+    rating, shipping_info: str(formData, "shipping_info"), shipping_coupon: str(formData, "shipping_coupon"), free_shipping: formData.get("free_shipping") === "on" ? true : null,
     promo_text: str(formData, "promo_text"), data_updated_at: new Date().toISOString(),
   };
 
