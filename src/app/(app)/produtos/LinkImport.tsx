@@ -23,10 +23,12 @@ export default function LinkImport() {
       set("image_url", j.image ?? ""); set("original_url", j.permalink ?? url);
       if (j.category) set("category", j.category);
       const fs = f.elements.namedItem("free_shipping") as HTMLInputElement | null; if (fs) fs.checked = j.free_shipping === true;
-      const aff = (f.elements.namedItem("affiliate_url") as HTMLInputElement | null)?.value.trim() || null;
+      const affEl = f.elements.namedItem("affiliate_url") as HTMLInputElement | null;
+      if (affEl && !affEl.value.trim() && j.shared) affEl.value = url.trim(); // link curto de afiliado que a própria usuária colou
+      const aff = affEl?.value.trim() || null;
       const ta = f.elements.namedItem("promo_text") as HTMLTextAreaElement | null;
       if (ta) ta.value = buildCaption({ title: j.title, price: j.price, previous_price: j.original_price, coupon: null, free_shipping: j.free_shipping === true, shipping_info: null, shipping_coupon: null, affiliate_url: aff });
-      setMsg({ ok: true, t: `Dados preenchidos${j.source === "pagina" ? " (lidos da página do anúncio)" : ""}. Confira, cole o seu link de afiliado e cadastre.${j.free_shipping ? "" : " Frete e cupom não vêm do anúncio: preencha se houver."}` });
+      setMsg({ ok: true, t: `Dados preenchidos${j.source === "pagina" ? " (lidos da página do anúncio)" : ""}. ${j.shared ? "O link colado foi usado como link de afiliado: teste-o e marque a confirmação." : "Confira, cole o seu link de afiliado e cadastre."}${j.free_shipping ? "" : " Frete e cupom não vêm do anúncio: preencha se houver."}` });
     } catch { setMsg({ ok: false, t: "Falha de conexão. Tente de novo." }); } finally { setBusy(false); }
   }
 
