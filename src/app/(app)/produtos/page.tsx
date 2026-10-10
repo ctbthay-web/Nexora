@@ -4,6 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { requireUser } from "@/lib/session";
 import { MARKETPLACES, PRODUCT_STATUS, type MarketplaceKey } from "@/lib/constants";
 import { brl, fmtDate } from "@/lib/utils";
+import CopyButton from "@/components/CopyButton";
 import { deleteProduct, duplicateProduct, enqueue, loadDemo, setStatus, toggleFavorite } from "./actions";
 
 type SP = { ok?: string; err?: string; q?: string; mp?: string; st?: string; fav?: string };
@@ -62,6 +63,14 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
             const st = PRODUCT_STATUS[p.status];
             return (
               <article key={p.id} className="card space-y-3">
+                <div className="flex gap-3">
+                  {p.image_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={p.image_url} alt="" className="h-24 w-24 shrink-0 rounded-lg border border-line object-cover" />
+                  ) : (
+                    <Link href={`/produtos/${p.id}`} className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-dashed border-line p-1 text-center text-xs text-muted">Sem imagem. Adicionar</Link>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="font-semibold">{p.favorite ? "⭐ " : ""}{p.title}</h2>
@@ -81,6 +90,23 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
                   <span className={`text-xs ${p.affiliate_verified ? "text-emerald-600" : "text-amber-600"}`}>
                     {p.affiliate_verified ? "✔ link de afiliado confirmado" : "⚠ sem link de afiliado confirmado"}
                   </span>
+                </div>
+                {(p.shipping_info || p.shipping_coupon) && (
+                  <p className="text-xs">
+                    {p.shipping_info && <>🚚 {p.shipping_info}</>}
+                    {p.shipping_coupon && <span className="badge ml-2 bg-indigo-500/15">Cupom de frete: {p.shipping_coupon}</span>}
+                  </p>
+                )}
+                {p.affiliate_url && <p className="truncate text-xs text-muted">Link: {p.affiliate_url}</p>}
+                {p.promo_text ? (
+                  <div className="rounded-lg border border-line bg-bg p-2 text-xs">
+                    <p className="whitespace-pre-line line-clamp-4">{p.promo_text}</p>
+                    <div className="mt-2"><CopyButton text={p.promo_text} /></div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600">Sem legenda. Abra Editar e use "Gerar a partir dos dados".</p>
+                )}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
