@@ -24,7 +24,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { o
       </form>
       <section className="card">
         <h2 className="mb-1 text-sm font-semibold">Provedores de IA, logotipo, regras de automação, limites</h2>
-        <p className="text-sm text-muted">Chegam nas Fases 2 e 3, junto com as funções que dependem deles.</p>
+        <p className="text-sm text-muted">A IA (Gemini), os horários e os limites ficam em <a href="/automacao" className="underline">Automação</a>. A chave do Gemini fica só no servidor (Vercel).</p>
       </section>
     </div>
   );
