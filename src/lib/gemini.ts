@@ -30,7 +30,7 @@ export async function geminiEvaluate(p: AiProduct): Promise<AiResult> {
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{ role: "user", parts: [{ text: `Dados do produto (JSON):\n${JSON.stringify(facts)}\n\nDevolva a nota, observações, a legenda (2 a 4 linhas, com emojis moderados, sem preço e sem link) e a lista de problemas.` }] }],
     generationConfig: {
-      temperature: 0.4, maxOutputTokens: 700, responseMimeType: "application/json",
+      temperature: 0.4, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
       responseSchema: {
         type: "OBJECT",
         properties: {
@@ -52,9 +52,10 @@ export async function geminiEvaluate(p: AiProduct): Promise<AiResult> {
     if (res.status === 429) throw new Error("Limite de uso do Gemini atingido. Tente mais tarde.");
     throw new Error(`Gemini respondeu ${res.status}: ${msg}`);
   }
-  const text = j?.candidates?.[0]?.content?.parts?.map((x: any) => x.text ?? "").join("") ?? "";
+  const cand = j?.candidates?.[0];
+  const text = (cand?.content?.parts ?? []).filter((x: any) => !x.thought).map((x: any) => x.text ?? "").join("");
   let o: any;
-  try { o = JSON.parse(text); } catch { throw new Error("O Gemini devolveu uma resposta fora do formato esperado."); }
+  try { o = JSON.parse(text); } catch { throw new Error(`O Gemini devolveu uma resposta fora do formato esperado (motivo: ${cand?.finishReason ?? j?.promptFeedback?.blockReason ?? "desconhecido"}).`); }
   return sanitizeAi(o);
 }
 
