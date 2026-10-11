@@ -6,6 +6,9 @@ export async function middleware(req: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const path = req.nextUrl.pathname;
 
+  // O agendador chama esta rota sem sessão de usuário; ela se protege com CRON_SECRET.
+  if (path.startsWith("/api/cron/")) return NextResponse.next();
+
   // Sem variáveis de ambiente: mostra a página de configuração.
   if (!url || !key) {
     return path === "/setup" ? NextResponse.next() : NextResponse.redirect(new URL("/setup", req.url));
