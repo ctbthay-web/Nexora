@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { go, logActivity, requireUser } from "@/lib/session";
 import { MARKETPLACES } from "@/lib/constants";
 import { isValidUrl, parseMoney, zonedToUtc } from "@/lib/utils";
+import { queueCaption } from "@/lib/gemini";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -149,7 +150,7 @@ export async function enqueue(formData: FormData) {
   if (!when) go("/produtos", "err", "Informe data e hora do agendamento.");
 
   const [{ data: p }, { data: ch }, { data: prof }] = await Promise.all([
-    supabase.from("products").select("title,status,affiliate_url,affiliate_verified").eq("id", id).single(),
+    supabase.from("products").select("title,status,affiliate_url,affiliate_verified,promo_text,price,previous_price,coupon,free_shipping,shipping_info,shipping_coupon").eq("id", id).single(),
     supabase.from("channels").select("name,enabled").eq("id", channelId).single(),
     supabase.from("profiles").select("timezone").eq("id", user.id).single(),
   ]);
@@ -164,6 +165,7 @@ export async function enqueue(formData: FormData) {
 
   const { error } = await supabase.from("publish_queue").insert({
     user_id: user.id, product_id: id, channel_id: channelId, scheduled_for: at.toISOString(),
+    caption: queueCaption({ ...(p as any), affiliate_url: p!.affiliate_url! }),
   });
   if (error) {
     if (error.code === "23505") go("/produtos", "err", "Este produto já está na fila (ou foi enviado) para esse canal.");
