@@ -91,6 +91,9 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
                     {p.affiliate_verified ? "✔ link de afiliado confirmado" : "⚠ sem link de afiliado confirmado"}
                   </span>
                 </div>
+                {p.ai_score != null && (
+                  <p className="text-xs"><span className="badge bg-sky-500/15 text-sky-700 dark:text-sky-300">IA: nota {p.ai_score}/10</span>{p.ai_notes ? <span className="ml-2 whitespace-pre-line text-muted">{p.ai_notes}</span> : null}</p>
+                )}
                 {(p.shipping_info || p.shipping_coupon) && (
                   <p className="text-xs">
                     {p.shipping_info && <>🚚 {p.shipping_info}</>}
