@@ -23,8 +23,14 @@ async function tick(req: NextRequest) {
   const db = adminClient();
   if (!db) return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada" }, { status: 500 });
   const t0 = Date.now();
-  const { data: all } = await db.from("profiles").select("id,timezone,automation_status");
-  for (const u of all ?? []) await ensureSettings(db, u.id).then(() => db.from("automation_settings").update({ last_tick_at: new Date().toISOString() }).eq("user_id", u.id));
+  const { data: all, error: profErr } = await db.from("profiles").select("id,timezone,automation_status");
+  if (profErr) { console.error("tick: erro ao ler perfis (chave service_role correta?)", profErr.message); return NextResponse.json({ error: "leitura de perfis falhou", detail: profErr.message }, { status: 500 }); }
+  if (!all?.length) { console.error("tick: nenhum perfil visível. A SUPABASE_SERVICE_ROLE_KEY provavelmente não é a chave service_role."); return NextResponse.json({ ok: false, warning: "nenhum perfil visível; confira a SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 }); }
+  for (const u of all) {
+    await ensureSettings(db, u.id);
+    const { error: hbErr } = await db.from("automation_settings").update({ last_tick_at: new Date().toISOString() }).eq("user_id", u.id);
+    if (hbErr) console.error("tick: não gravou o sinal do agendador:", hbErr.message);
+  }
   const users = (all ?? []).filter((u: any) => u.automation_status === "running");
   const report: any[] = [];
   for (const u of users ?? []) {
