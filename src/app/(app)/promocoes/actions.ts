@@ -24,7 +24,7 @@ export async function generatePromos(formData: FormData) {
     templateId ? supabase.from("message_templates").select("name,body").eq("id", templateId).maybeSingle() : Promise.resolve({ data: null }),
     useSlogan ? supabase.from("slogans").select("text") : Promise.resolve({ data: [] as any[] }),
     useCoupons ? supabase.from("coupons").select("marketplace,code,expires_on").eq("active", true) : Promise.resolve({ data: [] as any[] }),
-    supabase.from("products").select("title,price,previous_price,coupon,free_shipping,image_url,marketplace,external_id,original_url,affiliate_url,affiliate_verified").limit(2000),
+    supabase.from("products").select("title,price,previous_price,coupon,free_shipping,image_url,marketplace,external_id,original_url,affiliate_url,affiliate_verified").eq("is_demo", false).limit(2000),
   ]);
   const body = tpl.data?.body ?? DEFAULT_TEMPLATE;
   const today = new Date().toISOString().slice(0, 10);
