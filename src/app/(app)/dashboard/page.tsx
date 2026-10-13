@@ -88,7 +88,7 @@ export default async function Dashboard({ searchParams }: { searchParams: { ok?:
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Produtos por status</h2>
           {total === 0 ? (
-            <p className="text-sm text-muted">Nenhum produto ainda. <Link className="text-brand underline" href="/produtos">Cadastre ou carregue a demonstração.</Link></p>
+            <p className="text-sm text-muted">Nenhum produto ainda. <Link className="text-brand underline" href="/produtos">Cadastre seu primeiro produto.</Link></p>
           ) : (
             <div className="space-y-2">
               {Object.entries(statusCounts).map(([s, n]) => (
