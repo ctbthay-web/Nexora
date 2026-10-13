@@ -79,3 +79,27 @@ export async function testMarketplace(formData: FormData) {
   await logActivity(supabase, user.id, "marketplace.checked", { title: label });
   go("/marketplaces", "ok", `${label}: configuração local completa. A conexão real com a API só poderá ser testada na Fase 2.`);
 }
+
+/** Salva App ID e Secret da API de afiliados da Shopee (a Secret nunca volta para o navegador). */
+export async function saveShopeeApi(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const appId = String(formData.get("app_id") ?? "").trim();
+  const secret = String(formData.get("app_secret") ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{4,40}$/.test(appId)) go("/marketplaces", "err", "App ID inválido: use só letras, números, - ou _ (sem espaços).");
+  const { data: cur } = await supabase.from("shopee_api").select("app_secret").eq("user_id", user.id).maybeSingle();
+  const finalSecret = secret || cur?.app_secret || "";
+  if (finalSecret.length < 8 || finalSecret.length > 200 || /\s/.test(finalSecret)) go("/marketplaces", "err", "Informe a Secret da Shopee (sem espaços).");
+  const { error } = await supabase.from("shopee_api").upsert({ user_id: user.id, app_id: appId, app_secret: finalSecret, updated_at: new Date().toISOString() });
+  if (error) go("/marketplaces", "err", `Não consegui salvar: ${error.message}`);
+  await logActivity(supabase, user.id, "shopee.credentials_saved", { title: "Shopee" });
+  revalidatePath("/marketplaces");
+  go("/marketplaces", "ok", "App ID e Secret da Shopee salvos. A busca de produtos da Shopee ainda será ligada na próxima etapa.");
+}
+
+export async function removeShopeeApi() {
+  const { supabase, user } = await requireUser();
+  await supabase.from("shopee_api").delete().eq("user_id", user.id);
+  await logActivity(supabase, user.id, "shopee.credentials_removed", { title: "Shopee" });
+  revalidatePath("/marketplaces");
+  go("/marketplaces", "ok", "Credenciais da Shopee removidas.");
+}
