@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { MARKETPLACES, PRODUCT_STATUS, type MarketplaceKey } from "@/lib/constants";
 import { brl, fmtDate } from "@/lib/utils";
 import CopyButton from "@/components/CopyButton";
-import { deleteProduct, duplicateProduct, enqueue, loadDemo, setStatus, toggleFavorite } from "./actions";
+import { deleteDemos, deleteProduct, duplicateProduct, enqueue, setStatus, toggleFavorite } from "./actions";
 
 type SP = { ok?: string; err?: string; q?: string; mp?: string; st?: string; fav?: string };
 
@@ -23,13 +23,14 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
     supabase.from("profiles").select("timezone").eq("id", user.id).single(),
   ]);
   const tz = prof?.timezone ?? "America/Sao_Paulo";
+  const hasDemo = (products ?? []).some((p: any) => p.is_demo);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Produtos</h1>
         <div className="flex gap-2">
-          <form action={loadDemo}><SubmitButton className="btn">Carregar demonstração</SubmitButton></form>
+          {hasDemo && <form action={deleteDemos}><SubmitButton className="btn btn-danger" confirm="Excluir todos os produtos de demonstração (dados fictícios)?">Excluir demonstrações</SubmitButton></form>}
           <Link href="/produtos/novo" className="btn btn-primary">+ Novo produto</Link>
         </div>
       </div>
@@ -52,7 +53,7 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
       </form>
 
       <p className="text-xs text-muted">
-        Para buscar produtos do Mercado Livre use a tela Buscar (🔎). Aqui você vê e cadastra produtos manualmente. Itens [DEMO] são fictícios e não podem ser publicados sem link de afiliado confirmado.
+        Para buscar produtos do Mercado Livre use a tela Buscar (🔎). Aqui você vê e cadastra produtos manualmente.
       </p>
 
       {(products ?? []).length === 0 ? (
