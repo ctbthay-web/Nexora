@@ -118,27 +118,14 @@ export async function duplicateProduct(formData: FormData) {
   go("/produtos", "ok", "Produto duplicado (sem link original, para evitar conflito de duplicidade).");
 }
 
-/** Dados de DEMONSTRAÇÃO, claramente marcados. Sem link de afiliado: não podem ser publicados. */
-export async function loadDemo() {
+/** Remove os itens de demonstração (dados fictícios) antigos. O Nexora não cria mais dados de exemplo. */
+export async function deleteDemos() {
   const { supabase, user } = await requireUser();
-  const demo = [
-    ["shopee", "Fone Bluetooth sem fio", 59.9, 99.9, "Eletrônicos"],
-    ["mercadolivre", "Panela antiaderente 24cm", 74.5, 119.0, "Casa"],
-    ["amazon", "Teclado mecânico compacto", 189.0, 249.0, "Informática"],
-    ["magalu", "Liquidificador 700W", 129.9, null, "Utilidades"],
-    ["shein", "Conjunto de pijama feminino", 49.9, 79.9, "Moda"],
-    ["shopee", "Organizador de gavetas (kit 6)", 24.9, 39.9, "Casa"],
-  ] as const;
-  const rows = demo.map(([marketplace, title, price, previous, category]) => ({
-    user_id: user.id, marketplace, external_id: `demo-${randomUUID()}`, title: `[DEMO] ${title}`,
-    price, previous_price: previous, category, source: "demo", is_demo: true,
-    promo_text: "Dados fictícios de demonstração.",
-  }));
-  const { error } = await supabase.from("products").insert(rows);
+  const { data, error } = await supabase.from("products").delete().eq("is_demo", true).select("id");
   if (error) go("/produtos", "err", error.message);
-  await logActivity(supabase, user.id, "demo.loaded", { count: rows.length });
+  await logActivity(supabase, user.id, "demo.deleted", { count: data?.length ?? 0 });
   revalidatePath("/produtos");
-  go("/produtos", "ok", "6 produtos de DEMONSTRAÇÃO criados (dados fictícios).");
+  go("/produtos", "ok", `${data?.length ?? 0} produto(s) de demonstração excluído(s).`);
 }
 
 export async function enqueue(formData: FormData) {
