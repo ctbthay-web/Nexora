@@ -5,7 +5,7 @@ import { MARKETPLACES, type MarketplaceKey } from "@/lib/constants";
 import { fmtDate } from "@/lib/utils";
 import CopyButton from "@/components/CopyButton";
 import { headers } from "next/headers";
-import { saveMarketplace, saveMlApp, testMarketplace } from "./actions";
+import { removeShopeeApi, saveMarketplace, saveMlApp, saveShopeeApi, testMarketplace } from "./actions";
 
 const LOGTXT: Record<string, string> = {
   "ml.credentials_saved": "Aplicação salva",
@@ -23,6 +23,7 @@ const ST: Record<string, [string, string]> = {
 export default async function MarketplacesPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
   const { supabase, user } = await requireUser();
   const { data: mlApp } = await supabase.from("ml_app").select("client_id").maybeSingle();
+  const { data: shopeeApi } = await supabase.from("shopee_api").select("app_id").maybeSingle();
   const { data: mlLog } = await supabase.from("activity_log").select("action,created_at").eq("details->>title", "Mercado Livre").order("created_at", { ascending: false }).limit(5);
   const h = headers();
   const redirectUri = `https://${h.get("x-forwarded-host") ?? h.get("host")}/api/ml/callback`;
@@ -81,6 +82,18 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
                       {(mlLog ?? []).map((l: any, n: number) => <p key={n}>{fmtDate(l.created_at)} · {LOGTXT[l.action] ?? l.action}</p>)}
                     </div>
                   )}
+                </div>
+              )}
+              {k === "shopee" && (
+                <div className="space-y-2 rounded-lg border border-line bg-bg p-3 text-xs">
+                  <p className="font-semibold">API de afiliados da Shopee (App ID e Secret)</p>
+                  <p className="text-muted">A Secret fica guardada só no servidor, protegida por RLS, e nunca volta para a tela. Nunca envie a Secret no chat. Por enquanto o Nexora só guarda estes dados; a busca de produtos da Shopee ainda será ligada.</p>
+                  <form action={saveShopeeApi} className="space-y-2">
+                    <div><label className="label">App ID</label><input name="app_id" defaultValue={shopeeApi?.app_id ?? ""} autoComplete="off" className="input" /></div>
+                    <div><label className="label">Secret{shopeeApi ? " — já salva; deixe em branco para manter" : ""}</label><input name="app_secret" type="password" autoComplete="off" placeholder={shopeeApi ? "••••••••••" : ""} className="input" /></div>
+                    <SubmitButton>Salvar App ID e Secret</SubmitButton>
+                  </form>
+                  {shopeeApi && <form action={removeShopeeApi}><SubmitButton className="btn btn-danger" confirm="Remover o App ID e a Secret da Shopee?">Remover credenciais</SubmitButton></form>}
                 </div>
               )}
               <form action={saveMarketplace} className="space-y-2">
