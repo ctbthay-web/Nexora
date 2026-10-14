@@ -69,6 +69,7 @@ async function fetchHtml(url: string, cookies?: Record<string, string>): Promise
     if (!isValidUrl(current) || !current.startsWith("https://")) return { ok: false, reason: "link precisa ser https" };
     const mk = detectMarketplace(current);
     if (!mk) return { ok: false, reason: "loja não reconhecida" };
+    if (/account-verification|captcha|\/gz\/verify/i.test(current)) return { ok: false, reason: "o Mercado Livre pediu verificação anti-robô (account-verification); o Nexora parou e não tenta contornar" };
     const ck = cookies?.[mk]; // o cookie só vai para a PRÓPRIA loja a que pertence
     let res: Response;
     try {
