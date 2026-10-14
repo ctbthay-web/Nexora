@@ -131,5 +131,8 @@ export async function fetchSearchItems(term: string, cookies?: Record<string, st
   const r = await fetchHtml(`https://lista.mercadolivre.com.br/${sl}`, cookies);
   if (!r.ok) return r;
   const items = extractListing(r.html);
-  return items.length ? { ok: true, items } : { ok: false, reason: `a página de resultados de "${term}" não trouxe produtos legíveis` };
+  if (items.length) return { ok: true, items };
+  const title = (r.html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+  const ld = (r.html.match(/application\/ld\+json/gi) ?? []).length;
+  return { ok: false, reason: `a página de "${term}" veio sem a lista de produtos (título: "${title || "sem título"}"; ${r.html.length} caracteres; ${ld} bloco(s) de dados; endereço final: ${r.url.slice(0, 80)})` };
 }
