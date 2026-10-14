@@ -94,7 +94,7 @@ export default async function AutomationPage({ searchParams }: { searchParams: {
         </div>
         <div><label className="label">Nota mínima da IA (modo automático)</label><input name="min_score" type="number" min={0} max={10} defaultValue={s.min_score} className="input" /></div>
         <div><label className="label">Limite diário de chamadas ao Gemini</label><input name="ai_daily_limit" type="number" min={0} max={500} defaultValue={s.ai_daily_limit} className="input" /></div>
-        <div className="md:col-span-2"><label className="label">Termos de busca no Mercado Livre (um por linha, opcional)</label><textarea name="search_terms" rows={3} defaultValue={s.search_terms.join("\n")} className="input" placeholder={"fone bluetooth\npanela antiaderente"} /><p className="mt-1 text-xs text-muted">A busca usa a API oficial. Se o Mercado Livre bloquear (403), a rotina avisa e segue com os produtos que você já importou.</p></div>
+        <div className="md:col-span-2"><label className="label">Links de produtos para acompanhar e termos de busca (um por linha)</label><textarea name="search_terms" rows={3} defaultValue={s.search_terms.join("\n")} className="input" placeholder={"https://www.mercadolivre.com.br/...\nhttps://shopee.com.br/...\nfone bluetooth"} /><p className="mt-1 text-xs text-muted">Linhas que começam com https:// são links de produtos: a rotina abre a página pública (usando o cookie salvo da loja, se houver) e cadastra os novos. As demais linhas são termos de busca pela API oficial do Mercado Livre (hoje bloqueada, 403). Se uma loja bloquear a leitura, a rotina avisa e nada é inventado.</p></div>
         <div className="md:col-span-2"><SubmitButton>Salvar programação</SubmitButton></div>
       </form>
 
