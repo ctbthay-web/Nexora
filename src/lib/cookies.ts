@@ -8,7 +8,7 @@ const VALUE = /^[^\x00-\x1f\x7f;\s]*$/;
 export function parseCookieInput(raw: string): { ok: true; header: string; count: number } | { ok: false; error: string } {
   const text = raw.trim();
   if (!text) return { ok: false, error: "Cole o cookie." };
-  if (text.length > 12000) return { ok: false, error: "Cookie grande demais." };
+  if (text.length > 500000) return { ok: false, error: "Texto grande demais." };
   const pairs: [string, string][] = [];
   if (text.startsWith("[") || text.startsWith("{")) {
     let data: any;
@@ -26,5 +26,7 @@ export function parseCookieInput(raw: string): { ok: true; header: string; count
     if (!NAME.test(n)) return { ok: false, error: `Nome de cookie inválido: ${n.slice(0, 30)}` };
     if (!VALUE.test(v)) return { ok: false, error: `Valor inválido no cookie ${n}.` };
   }
-  return { ok: true, header: pairs.map(([n, v]) => `${n}=${v}`).join("; "), count: pairs.length };
+  const header = pairs.map(([n, v]) => `${n}=${v}`).join("; ");
+  if (header.length > 16000) return { ok: false, error: `Os cookies somam ${header.length} caracteres (limite 16000). Exporte só os cookies do site da loja.` };
+  return { ok: true, header, count: pairs.length };
 }
