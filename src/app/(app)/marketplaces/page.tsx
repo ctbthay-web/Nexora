@@ -5,7 +5,7 @@ import { MARKETPLACES, type MarketplaceKey } from "@/lib/constants";
 import { fmtDate } from "@/lib/utils";
 import CopyButton from "@/components/CopyButton";
 import { headers } from "next/headers";
-import { removeShopeeApi, saveMarketplace, saveMlApp, saveShopeeApi, testMarketplace } from "./actions";
+import { removeSessionCookie, saveSessionCookie, removeShopeeApi, saveMarketplace, saveMlApp, saveShopeeApi, testMarketplace } from "./actions";
 
 const LOGTXT: Record<string, string> = {
   "ml.credentials_saved": "Aplicação salva",
@@ -24,6 +24,7 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
   const { supabase, user } = await requireUser();
   const { data: mlApp } = await supabase.from("ml_app").select("client_id").maybeSingle();
   const { data: shopeeApi } = await supabase.from("shopee_api").select("app_id").maybeSingle();
+  const { data: ckRows } = await supabase.from("session_cookies").select("marketplace,updated_at");
   const { data: mlLog } = await supabase.from("activity_log").select("action,created_at").eq("details->>title", "Mercado Livre").order("created_at", { ascending: false }).limit(5);
   const h = headers();
   const redirectUri = `https://${h.get("x-forwarded-host") ?? h.get("host")}/api/ml/callback`;
@@ -96,6 +97,21 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
                   {shopeeApi && <form action={removeShopeeApi}><SubmitButton className="btn btn-danger" confirm="Remover o App ID e a Secret da Shopee?">Remover credenciais</SubmitButton></form>}
                 </div>
               )}
+              {(k === "mercadolivre" || k === "shopee") && (() => {
+                const ck = (ckRows ?? []).find((r: any) => r.marketplace === k);
+                return (
+                  <div className="space-y-2 rounded-lg border border-line bg-bg p-3 text-xs">
+                    <p className="font-semibold">Cookie de sessão{ck ? ` — salvo em ${fmtDate(ck.updated_at)}` : ""}</p>
+                    <p className="text-muted">Cole o texto do cookie ou o JSON exportado pelo Cookie-Editor. Fica criptografado no servidor, nunca volta para a tela e você pode trocar ou remover quando quiser. Hoje ele é enviado só para a própria loja quando você usa "Importar por link" em Produtos. Se a loja bloquear mesmo assim, o app avisa. Quem tiver este cookie acessa sua conta: nunca cole no chat e troque-o (saindo da conta no site) se suspeitar de vazamento.</p>
+                    <form action={saveSessionCookie} className="space-y-2">
+                      <input type="hidden" name="marketplace" value={k} />
+                      <textarea name="cookie" rows={3} autoComplete="off" spellCheck={false} placeholder={ck ? "Cookie já salvo — cole um novo para trocar" : "Cole o cookie aqui"} className="input font-mono" />
+                      <SubmitButton>{ck ? "Trocar cookie" : "Salvar cookie"}</SubmitButton>
+                    </form>
+                    {ck && <form action={removeSessionCookie}><input type="hidden" name="marketplace" value={k} /><SubmitButton className="btn btn-danger" confirm="Remover o cookie salvo?">Remover cookie</SubmitButton></form>}
+                  </div>
+                );
+              })()}
               <form action={saveMarketplace} className="space-y-2">
                 <input type="hidden" name="marketplace" value={k} />
                 <div><label className="label">{m.idLabel}</label><input name="affiliate_id" defaultValue={c?.affiliate_id ?? ""} className="input" /></div>
