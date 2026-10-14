@@ -5,6 +5,10 @@ import { publishDue } from "./publisher";
 import { upcomingSlots } from "./schedule";
 import { tgGetMe } from "./telegram";
 import { isValidUrl } from "./utils";
+import { createHash } from "crypto";
+import { decryptText } from "./crypto";
+import { fetchProductMeta } from "./pagemeta";
+import { detectMarketplace, extractExternalId } from "./promo";
 
 export type Step = { name: string; status: "ok" | "skipped" | "blocked" | "error"; message: string };
 export type Settings = {
@@ -17,6 +21,33 @@ export async function ensureSettings(db: SupabaseClient, userId: string): Promis
   if (data) return data as Settings;
   const { data: created } = await db.from("automation_settings").upsert({ user_id: userId }).select("*").single();
   return created as Settings;
+}
+
+const isLink = (t: string) => /^https:\/\//i.test(t);
+
+/** Abre cada link de produto salvo na automação (página pública, com o cookie da loja se houver) e cadastra os novos. Nada é inventado. */
+async function collectLinks(db: SupabaseClient, userId: string, links: string[], limit: number): Promise<{ saved: number; known: number; problems: string[] }> {
+  const { data: ck } = await db.from("session_cookies").select("marketplace,cookie_enc").eq("user_id", userId);
+  const cookies: Record<string, string> = {};
+  for (const r of ck ?? []) { const d = decryptText(r.cookie_enc); if (d) cookies[r.marketplace] = d; }
+  let saved = 0, known = 0; const problems: string[] = [];
+  for (const link of links) {
+    if (saved >= limit) break;
+    const mk = detectMarketplace(link);
+    if (!mk) { problems.push("loja não reconhecida"); continue; }
+    const r = await fetchProductMeta(link, cookies);
+    if (!r.ok) { problems.push(r.reason); continue; }
+    const { title, price, image } = r.meta;
+    if (!title || price == null) { problems.push("a página não trouxe título e preço legíveis"); continue; }
+    const ext = extractExternalId(r.url) ?? extractExternalId(link) ?? `url-${createHash("sha1").update(r.url).digest("hex").slice(0, 20)}`;
+    const { data, error } = await db.from("products").upsert({
+      user_id: userId, marketplace: mk, external_id: ext, title, price, image_url: image, original_url: r.url,
+      source: "api", is_demo: false, status: "found", affiliate_verified: false, data_updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,marketplace,external_id", ignoreDuplicates: true }).select("id");
+    if (error) { problems.push(error.message); continue; }
+    if (data?.length) saved++; else known++;
+  }
+  return { saved, known, problems: Array.from(new Set(problems)) };
 }
 
 /** Rotina completa: conexões → coleta → IA → aprovação → fila → publicação. Nunca simula sucesso. */
@@ -54,11 +85,18 @@ export async function runPipeline(db: SupabaseClient, userId: string, kind: "dai
     add("Gemini", geminiConfigured() ? "ok" : "blocked", geminiConfigured() ? "Chave configurada no servidor." : "GEMINI_API_KEY não configurada na Vercel.");
 
     // 2. Coleta (somente por API oficial; sem simular) -------------------------------------
-    if (!s.search_terms.length) add("Coleta", "skipped", "Nenhum termo de busca configurado. Produtos entram pelo botão roxo ou por Buscar/Novo produto.");
+    const watchLinks = s.search_terms.filter(isLink);
+    const terms = s.search_terms.filter((t) => !isLink(t));
+    if (watchLinks.length) {
+      const r = await collectLinks(db, userId, watchLinks, s.max_products_per_run);
+      const extra = [r.known ? `${r.known} já cadastrado(s)` : "", r.problems.length ? `não lidos: ${r.problems.slice(0, 3).join("; ")}` : ""].filter(Boolean).join(" · ");
+      add("Coleta de links", r.saved ? "ok" : r.problems.length ? "blocked" : "ok", `${r.saved} produto(s) novo(s) a partir dos links${extra ? ` (${extra})` : ""}.`);
+    }
+    if (!terms.length) { if (!watchLinks.length) add("Coleta", "skipped", "Nenhum termo de busca ou link configurado. Produtos entram por Importar por link, Buscar ou Novo produto."); }
     else if (!mlToken) add("Coleta", "skipped", "Mercado Livre não está conectado.");
     else {
       let saved = 0; let blocked: string | null = null;
-      for (const term of s.search_terms) {
+      for (const term of terms) {
         if (saved >= s.max_products_per_run) break;
         const r = await searchMl(mlToken, term);
         if ("error" in r) { blocked = r.error; break; }
