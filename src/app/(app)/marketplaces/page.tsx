@@ -69,7 +69,7 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
                   <p className="text-muted">Abra o app sempre por este mesmo endereço (<b>{redirectUri.replace("/api/ml/callback", "")}</b>); outro endereço da Vercel gera outro redirect e dá erro.</p>
                   <form action={saveMlApp} className="space-y-2">
                     <div><label className="label">ID da aplicação (Client ID)</label><input name="client_id" defaultValue={mlApp?.client_id ?? ""} inputMode="numeric" className="input" /></div>
-                    <div><label className="label">Chave secreta (Client Secret){mlApp ? " — já salva; deixe em branco para manter" : ""}</label><input name="client_secret" type="password" autoComplete="off" placeholder={mlApp ? "••••••••••" : ""} className="input" /></div>
+                    <div><label className="label">Chave secreta (Client Secret){mlApp ? " — já salva; deixe em branco para manter" : ""}</label><input name="client_secret" type="text" autoComplete="off" data-lpignore="true" data-1p-ignore="true" spellCheck={false} placeholder={mlApp ? "••••••••••" : ""} className="input" style={{ WebkitTextSecurity: "disc" } as React.CSSProperties} /></div>
                     <SubmitButton>Salvar aplicação</SubmitButton>
                   </form>
                   {!mlApp ? null : mlTok ? (
@@ -90,8 +90,8 @@ export default async function MarketplacesPage({ searchParams }: { searchParams:
                   <p className="font-semibold">API de afiliados da Shopee (App ID e Secret)</p>
                   <p className="text-muted">A Secret fica guardada só no servidor, protegida por RLS, e nunca volta para a tela. Nunca envie a Secret no chat. Por enquanto o Nexora só guarda estes dados; a busca de produtos da Shopee ainda será ligada.</p>
                   <form action={saveShopeeApi} className="space-y-2">
-                    <div><label className="label">App ID</label><input name="app_id" defaultValue={shopeeApi?.app_id ?? ""} autoComplete="off" className="input" /></div>
-                    <div><label className="label">Secret{shopeeApi ? " — já salva; deixe em branco para manter" : ""}</label><input name="app_secret" type="password" autoComplete="off" placeholder={shopeeApi ? "••••••••••" : ""} className="input" /></div>
+                    <div><label className="label">App ID</label><input name="app_id" defaultValue={shopeeApi?.app_id ?? ""} autoComplete="off" data-lpignore="true" data-1p-ignore="true" inputMode="numeric" className="input" /></div>
+                    <div><label className="label">Secret{shopeeApi ? " — já salva; deixe em branco para manter" : ""}</label><input name="app_secret" type="text" autoComplete="off" data-lpignore="true" data-1p-ignore="true" spellCheck={false} placeholder={shopeeApi ? "••••••••••" : ""} className="input" style={{ WebkitTextSecurity: "disc" } as React.CSSProperties} /></div>
                     <SubmitButton>Salvar App ID e Secret</SubmitButton>
                   </form>
                   {shopeeApi && <form action={removeShopeeApi}><SubmitButton className="btn btn-danger" confirm="Remover o App ID e a Secret da Shopee?">Remover credenciais</SubmitButton></form>}
