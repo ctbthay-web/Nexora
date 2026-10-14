@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { MARKETPLACES, PRODUCT_STATUS, type MarketplaceKey } from "@/lib/constants";
 import { brl, fmtDate } from "@/lib/utils";
 import CopyButton from "@/components/CopyButton";
-import { deleteDemos, deleteProduct, duplicateProduct, enqueue, setStatus, toggleFavorite } from "./actions";
+import { deleteDemos, deleteProduct, importByLinks, duplicateProduct, enqueue, setStatus, toggleFavorite } from "./actions";
 
 type SP = { ok?: string; err?: string; q?: string; mp?: string; st?: string; fav?: string };
 
@@ -52,9 +52,12 @@ export default async function Products({ searchParams }: { searchParams: SP }) {
         </div>
       </form>
 
-      <p className="text-xs text-muted">
-        Para buscar produtos do Mercado Livre use a tela Buscar (🔎). Aqui você vê e cadastra produtos manualmente.
-      </p>
+      <form action={importByLinks} className="card space-y-2">
+        <label className="label">Importar por link (Mercado Livre, Shopee, Amazon…)</label>
+        <textarea name="links" rows={3} className="input" placeholder={"Cole links de produtos, um por linha (até 15)"} />
+        <p className="text-xs text-muted">O Nexora lê só a página pública (título, preço e imagem), sem login e sem cookies. Se a loja bloquear a leitura, avisamos e nada é inventado. O link de afiliado você confirma depois em Editar.</p>
+        <SubmitButton>Importar</SubmitButton>
+      </form>
 
       {(products ?? []).length === 0 ? (
         <div className="card text-sm text-muted">Nenhum produto encontrado.</div>
