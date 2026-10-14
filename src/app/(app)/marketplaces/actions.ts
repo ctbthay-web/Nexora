@@ -2,6 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { MARKETPLACES } from "@/lib/constants";
 import { go, logActivity, requireUser } from "@/lib/session";
+import { parseCookieInput } from "@/lib/cookies";
+import { encryptText } from "@/lib/crypto";
 import { ML_NEEDS_APP, getMlApp, getMlToken, mlGet } from "@/lib/ml";
 
 /** Salva ID e chave da aplicação do Mercado Livre na conta do usuário (nunca devolvidos ao navegador). */
@@ -102,4 +104,31 @@ export async function removeShopeeApi() {
   await logActivity(supabase, user.id, "shopee.credentials_removed", { title: "Shopee" });
   revalidatePath("/marketplaces");
   go("/marketplaces", "ok", "Credenciais da Shopee removidas.");
+}
+
+const COOKIE_MPS = ["mercadolivre", "shopee"];
+
+/** Salva o cookie de sessão (criptografado). Nunca é devolvido à tela; só dá para trocar ou remover. */
+export async function saveSessionCookie(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const mp = String(formData.get("marketplace") ?? "");
+  if (!COOKIE_MPS.includes(mp)) go("/marketplaces", "err", "Marketplace inválido.");
+  const r = parseCookieInput(String(formData.get("cookie") ?? ""));
+  if (!r.ok) go("/marketplaces", "err", r.error);
+  let enc: string;
+  try { enc = encryptText((r as any).header); } catch { go("/marketplaces", "err", "O servidor está sem chave para criptografar. Nada foi salvo."); return; }
+  const { error } = await supabase.from("session_cookies").upsert({ user_id: user.id, marketplace: mp, cookie_enc: enc, updated_at: new Date().toISOString() });
+  if (error) go("/marketplaces", "err", `Não consegui salvar: ${error.message}`);
+  await logActivity(supabase, user.id, "cookie.saved", { title: MARKETPLACES[mp as keyof typeof MARKETPLACES].label });
+  revalidatePath("/marketplaces");
+  go("/marketplaces", "ok", `Cookie salvo (${(r as any).count} itens, criptografado).`);
+}
+
+export async function removeSessionCookie(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const mp = String(formData.get("marketplace") ?? "");
+  await supabase.from("session_cookies").delete().eq("user_id", user.id).eq("marketplace", mp);
+  await logActivity(supabase, user.id, "cookie.removed", { title: mp });
+  revalidatePath("/marketplaces");
+  go("/marketplaces", "ok", "Cookie removido.");
 }
