@@ -61,16 +61,18 @@ const MAX_BYTES = 1_500_000;
 export type FetchResult = { ok: true; url: string; meta: PageMeta } | { ok: false; reason: string };
 
 /** Busca UMA página pública de produto (sem login, sem cookies). Só lojas conhecidas; não tenta burlar bloqueios. */
-export async function fetchProductMeta(url: string): Promise<FetchResult> {
+export async function fetchProductMeta(url: string, cookies?: Record<string, string>): Promise<FetchResult> {
   let current = url;
   for (let hop = 0; hop < 4; hop++) {
     if (!isValidUrl(current) || !current.startsWith("https://")) return { ok: false, reason: "link precisa ser https" };
-    if (!detectMarketplace(current)) return { ok: false, reason: "loja não reconhecida" };
+    const mk = detectMarketplace(current);
+    if (!mk) return { ok: false, reason: "loja não reconhecida" };
+    const ck = cookies?.[mk]; // o cookie só vai para a PRÓPRIA loja a que pertence
     let res: Response;
     try {
       res = await fetch(current, {
         redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(8000),
-        headers: { "user-agent": "NexoraBot/1.0 (leitura de página pública de produto)", "accept-language": "pt-BR,pt;q=0.9", accept: "text/html" },
+        headers: { "user-agent": "NexoraBot/1.0 (leitura de página pública de produto)", "accept-language": "pt-BR,pt;q=0.9", accept: "text/html", ...(ck ? { cookie: ck } : {}) },
       });
     } catch { return { ok: false, reason: "não foi possível abrir a página (tempo esgotado ou rede)" }; }
     if (res.status >= 300 && res.status < 400) {
@@ -79,7 +81,7 @@ export async function fetchProductMeta(url: string): Promise<FetchResult> {
       try { current = new URL(loc, current).toString(); } catch { return { ok: false, reason: "redirecionamento inválido" }; }
       continue;
     }
-    if (res.status === 403 || res.status === 429) return { ok: false, reason: `a loja bloqueou a leitura automática (HTTP ${res.status}); nada foi coletado` };
+    if (res.status === 403 || res.status === 429) return { ok: false, reason: `a loja bloqueou a leitura automática (HTTP ${res.status}); nada foi coletado${ck ? " (mesmo com o cookie)" : ""}` };
     if (!res.ok) return { ok: false, reason: `a loja respondeu HTTP ${res.status}` };
     const buf = await res.arrayBuffer();
     const html = new TextDecoder("utf-8").decode(buf.byteLength > MAX_BYTES ? buf.slice(0, MAX_BYTES) : buf);
