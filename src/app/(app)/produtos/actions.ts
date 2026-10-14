@@ -5,6 +5,9 @@ import { go, logActivity, requireUser } from "@/lib/session";
 import { MARKETPLACES } from "@/lib/constants";
 import { isValidUrl, parseMoney, zonedToUtc } from "@/lib/utils";
 import { queueCaption } from "@/lib/gemini";
+import { detectMarketplace, extractExternalId } from "@/lib/promo";
+import { fetchProductMeta } from "@/lib/pagemeta";
+import { createHash } from "node:crypto";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -162,4 +165,31 @@ export async function enqueue(formData: FormData) {
   await logActivity(supabase, user.id, "queue.added", { title: p!.title, channel: ch!.name });
   revalidatePath("/produtos");
   go("/fila", "ok", "Produto agendado na fila.");
+}
+
+/** Importa produtos colando links públicos: lê título, preço e imagem da página (sem login, sem cookies, sem API). */
+export async function importByLinks(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const links = Array.from(new Set(String(formData.get("links") ?? "").split(/\s+/).map((x) => x.trim()).filter(Boolean))).slice(0, 15);
+  if (!links.length) go("/produtos", "err", "Cole ao menos um link de produto (um por linha).");
+  let ok = 0; const problems: string[] = [];
+  for (const link of links) {
+    const mk = detectMarketplace(link);
+    if (!mk) { problems.push("loja não reconhecida"); continue; }
+    const r = await fetchProductMeta(link);
+    if (!r.ok) { problems.push(r.reason); continue; }
+    const { title, price, image } = r.meta;
+    if (!title || price == null) { problems.push("a página não trouxe título e preço legíveis"); continue; }
+    const ext = extractExternalId(r.url) ?? extractExternalId(link) ?? `url-${createHash("sha1").update(r.url).digest("hex").slice(0, 20)}`;
+    const { data, error } = await supabase.from("products").upsert({
+      user_id: user.id, marketplace: mk, external_id: ext, title, price, image_url: image, original_url: r.url,
+      source: "api", is_demo: false, status: "found", affiliate_verified: false, data_updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,marketplace,external_id", ignoreDuplicates: true }).select("id");
+    if (error) { problems.push(error.message); continue; }
+    if (data && data.length) ok++; else problems.push("já estava cadastrado");
+  }
+  await logActivity(supabase, user.id, "product.imported_links", { title: "importação por link", ok, problems: problems.length });
+  revalidatePath("/produtos");
+  const tail = problems.length ? ` Não importados: ${Array.from(new Set(problems)).slice(0, 3).join("; ")}.` : "";
+  go("/produtos", ok ? "ok" : "err", `${ok} produto(s) importado(s).${tail} O link de afiliado continua sendo seu: confirme em Editar antes de publicar.`);
 }
