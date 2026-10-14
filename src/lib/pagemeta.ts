@@ -60,8 +60,10 @@ const MAX_BYTES = 1_500_000;
 
 export type FetchResult = { ok: true; url: string; meta: PageMeta } | { ok: false; reason: string };
 
-/** Busca UMA página pública de produto (sem login, sem cookies). Só lojas conhecidas; não tenta burlar bloqueios. */
-export async function fetchProductMeta(url: string, cookies?: Record<string, string>): Promise<FetchResult> {
+type HtmlResult = { ok: true; url: string; html: string } | { ok: false; reason: string };
+
+/** Baixa UMA página pública (sem login). Só lojas conhecidas; o cookie só vai para a loja dele; não tenta burlar bloqueios. */
+async function fetchHtml(url: string, cookies?: Record<string, string>): Promise<HtmlResult> {
   let current = url;
   for (let hop = 0; hop < 4; hop++) {
     if (!isValidUrl(current) || !current.startsWith("https://")) return { ok: false, reason: "link precisa ser https" };
@@ -85,7 +87,49 @@ export async function fetchProductMeta(url: string, cookies?: Record<string, str
     if (!res.ok) return { ok: false, reason: `a loja respondeu HTTP ${res.status}` };
     const buf = await res.arrayBuffer();
     const html = new TextDecoder("utf-8").decode(buf.byteLength > MAX_BYTES ? buf.slice(0, MAX_BYTES) : buf);
-    return { ok: true, url: current, meta: extractMeta(html) };
+    return { ok: true, url: current, html };
   }
   return { ok: false, reason: "redirecionamentos demais" };
+}
+
+/** Busca UMA página pública de produto. */
+export async function fetchProductMeta(url: string, cookies?: Record<string, string>): Promise<FetchResult> {
+  const r = await fetchHtml(url, cookies);
+  return r.ok ? { ok: true, url: r.url, meta: extractMeta(r.html) } : r;
+}
+
+export type ListItem = { title: string; price: number; image: string | null; url: string; rating: number | null };
+
+/** Lê os produtos que a página de resultados declara (JSON-LD). Só itens do Mercado Livre com título, preço e link. */
+export function extractListing(html: string): ListItem[] {
+  const out: ListItem[] = []; const seen = new Set<string>();
+  for (const b of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const prods: any[] = []; walk(JSON.parse(b[1]), prods);
+      for (const p of prods) {
+        const o = Array.isArray(p.offers) ? p.offers[0] : p.offers;
+        const url = typeof o?.url === "string" ? o.url.split("#")[0] : null;
+        const price = toNum(o?.price);
+        const title = typeof p.name === "string" ? decode(p.name).trim().slice(0, 300) : "";
+        if (!url || !isValidUrl(url) || detectMarketplace(url) !== "mercadolivre" || price == null || !title || seen.has(url)) continue;
+        seen.add(url);
+        const im = Array.isArray(p.image) ? p.image[0] : p.image;
+        const rt = Number(p.aggregateRating?.ratingValue);
+        out.push({ title, price, url, image: typeof im === "string" && isValidUrl(im) ? im : null, rating: Number.isFinite(rt) && rt > 0 && rt <= 5 ? rt : null });
+      }
+    } catch { /* ignora */ }
+  }
+  return out;
+}
+
+const slug = (term: string) => term.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+/** Busca um termo na página pública de resultados do Mercado Livre (usa o cookie salvo, se houver). */
+export async function fetchSearchItems(term: string, cookies?: Record<string, string>): Promise<{ ok: true; items: ListItem[] } | { ok: false; reason: string }> {
+  const sl = slug(term);
+  if (!sl) return { ok: false, reason: "termo inválido" };
+  const r = await fetchHtml(`https://lista.mercadolivre.com.br/${sl}`, cookies);
+  if (!r.ok) return r;
+  const items = extractListing(r.html);
+  return items.length ? { ok: true, items } : { ok: false, reason: `a página de resultados de "${term}" não trouxe produtos legíveis` };
 }
