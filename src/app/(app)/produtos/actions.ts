@@ -8,6 +8,7 @@ import { queueCaption } from "@/lib/gemini";
 import { detectMarketplace, extractExternalId } from "@/lib/promo";
 import { fetchProductMeta } from "@/lib/pagemeta";
 import { createHash } from "node:crypto";
+import { decryptText } from "@/lib/crypto";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -172,11 +173,14 @@ export async function importByLinks(formData: FormData) {
   const { supabase, user } = await requireUser();
   const links = Array.from(new Set(String(formData.get("links") ?? "").split(/\s+/).map((x) => x.trim()).filter(Boolean))).slice(0, 15);
   if (!links.length) go("/produtos", "err", "Cole ao menos um link de produto (um por linha).");
+  const { data: ckRows } = await supabase.from("session_cookies").select("marketplace,cookie_enc");
+  const cookies: Record<string, string> = {};
+  for (const r of ckRows ?? []) { const dc = decryptText(r.cookie_enc); if (dc) cookies[r.marketplace] = dc; }
   let ok = 0; const problems: string[] = [];
   for (const link of links) {
     const mk = detectMarketplace(link);
     if (!mk) { problems.push("loja não reconhecida"); continue; }
-    const r = await fetchProductMeta(link);
+    const r = await fetchProductMeta(link, cookies);
     if (!r.ok) { problems.push(r.reason); continue; }
     const { title, price, image } = r.meta;
     if (!title || price == null) { problems.push("a página não trouxe título e preço legíveis"); continue; }
