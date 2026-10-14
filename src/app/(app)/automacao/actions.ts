@@ -23,8 +23,9 @@ export async function saveAutomation(formData: FormData) {
   };
   const mode = String(formData.get("approval_mode"));
   if (mode !== "manual" && mode !== "auto") go(P, "err", "Modo de aprovação inválido.");
-  const terms = String(formData.get("search_terms") ?? "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 20);
-  if (terms.some((t) => t.length > 80)) go(P, "err", "Cada termo de busca pode ter até 80 caracteres.");
+  const terms = String(formData.get("search_terms") ?? "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 30);
+  if (terms.some((t) => /^https:\/\//i.test(t) ? t.length > 500 : t.length > 80)) go(P, "err", "Termo de busca: até 80 caracteres. Link: até 500.");
+  if (terms.some((t) => /^http:\/\//i.test(t))) go(P, "err", "Os links precisam começar com https://");
   await ensureSettings(supabase, user.id);
   const { error } = await supabase.from("automation_settings").update({
     post_times: [...new Set(times)].sort(), weekdays: [...new Set(weekdays)].sort(), run_time: runTime,
