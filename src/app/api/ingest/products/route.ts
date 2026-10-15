@@ -32,11 +32,15 @@ export async function POST(req: NextRequest) {
   let inserted = 0;
   if (rows.length) {
     const { data, error } = await db.from("products").upsert(
-      rows.map((r) => ({ ...r, user_id: userId, source: "api", is_demo: false, status: "found", affiliate_verified: false })),
+      rows.map((r) => ({ ...r, user_id: userId, source: "api", is_demo: false, status: "found", affiliate_verified: !!r.affiliate_url })),
       { onConflict: "user_id,marketplace,external_id", ignoreDuplicates: true },
     ).select("id");
     if (error) return NextResponse.json({ error: "não foi possível salvar", detail: error.message }, { status: 500 });
     inserted = data?.length ?? 0;
+  }
+  // produto que já existia sem link: completa com o link de afiliado gerado na sua conta (nunca troca um link já salvo)
+  for (const r of rows) {
+    if (r.affiliate_url) await db.from("products").update({ affiliate_url: r.affiliate_url, affiliate_verified: true }).eq("user_id", userId).eq("marketplace", r.marketplace).eq("external_id", r.external_id).is("affiliate_url", null);
   }
   await db.from("activity_log").insert({ user_id: userId, action: "ingest.received", details: { title: "n8n", received: rows.length + rejected.length, inserted, rejected: rejected.length } });
   return NextResponse.json({ ok: true, received: rows.length + rejected.length, inserted, duplicates: rows.length - inserted, rejected });
