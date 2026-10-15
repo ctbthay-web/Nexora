@@ -6,7 +6,7 @@ export const MAX_INGEST = 50;
 
 export type IngestRow = {
   marketplace: string; external_id: string; title: string; price: number; previous_price: number | null;
-  image_url: string | null; original_url: string; coupon: string | null; free_shipping: boolean | null; category: string | null;
+  image_url: string | null; original_url: string; affiliate_url: string | null; coupon: string | null; free_shipping: boolean | null; category: string | null;
 };
 
 const num = (v: unknown): number | null => {
@@ -20,6 +20,12 @@ const num = (v: unknown): number | null => {
   return null;
 };
 const txt = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+
+/** Só aceita link de afiliado no formato curto oficial gerado pelo botão Compartilhar do Mercado Livre (meli.la). */
+export function affiliateLink(mk: string, v: unknown): string | null {
+  const u = txt(v, 200);
+  return mk === "mercadolivre" && u && /^https:\/\/meli\.la\/[A-Za-z0-9]{4,20}$/.test(u) ? u : null;
+}
 
 /** Valida o que o n8n envia. Só aceita lojas conhecidas e dados completos; nada é inventado ou "corrigido". */
 export function validateIngest(body: unknown): { rows: IngestRow[]; rejected: { index: number; reason: string }[] } {
@@ -39,7 +45,7 @@ export function validateIngest(body: unknown): { rows: IngestRow[]; rejected: { 
     rows.push({
       marketplace: mk, title, price, previous_price: prevRaw != null && prevRaw > price ? prevRaw : null,
       external_id: extractExternalId(url) ?? `url-${createHash("sha1").update(url).digest("hex").slice(0, 20)}`,
-      image_url: image && isValidUrl(image) ? image : null, original_url: url,
+      image_url: image && isValidUrl(image) ? image : null, original_url: url, affiliate_url: affiliateLink(mk, p?.affiliate_url),
       coupon: txt(p?.coupon, 60), free_shipping: typeof p?.free_shipping === "boolean" ? p.free_shipping : null, category: txt(p?.category, 80),
     });
   });
